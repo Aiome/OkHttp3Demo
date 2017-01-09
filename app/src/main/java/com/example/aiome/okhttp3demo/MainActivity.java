@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void run() {
                                 mTextView.setText(result);
+
                             }
                         });
                     }
