@@ -10,12 +10,14 @@ import java.io.IOException;
 
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
-    private Button mButton;
+    private Button mButtonGet;
+    private Button mButtonPost;
     private TextView mTextView;
 
     @Override
@@ -23,23 +25,27 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mButton = (Button) findViewById(R.id.request);
+        mButtonGet = (Button) findViewById(R.id.requestAsync);
+        mButtonPost = (Button) findViewById(R.id.requestSync);
         mTextView = (TextView) findViewById(R.id.response);
 
         //1.创建OkHttpClient对象
-        OkHttpClient okHttpClient = new OkHttpClient();
+        final OkHttpClient okHttpClient = new OkHttpClient();
         //2.创建一个Request
-        Request request = new Request.Builder()
-                .url("https://github.com/aiome")
+        FormBody formBody = new FormBody.Builder()
+                .add("loginName","15230106379")
+                .add("password","123")
                 .build();
-        //3.创建一个call
-        final Call call = okHttpClient.newCall(request);
+        final Request request = new Request.Builder()
+                .url("http://192.168.3.106/api/account/login")
+                .post(formBody)
+                .build();
+;
 
-        mButton.setOnClickListener(new View.OnClickListener() {
+        mButtonPost.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                //4.请求加入调度
-                call.enqueue(new Callback() {
+                okHttpClient.newCall(request).enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
 
@@ -51,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                mTextView.setText(result);
+                                mTextView.setText("Post请求成功:" + result);
 
                             }
                         });
@@ -60,8 +66,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        mButtonGet.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //4.请求加入调度
+                okHttpClient.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
 
+                    }
 
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        final String result = response.body().string();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                mTextView.setText("Get请求成功:" + result);
+                            }
+                        });
+                    }
+                });
+            }
+        });
 
     }
 }
