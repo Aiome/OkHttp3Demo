@@ -6,18 +6,23 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import java.io.File;
 import java.io.IOException;
 
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.FormBody;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
     private Button mButtonGet;
     private Button mButtonPost;
+    private Button mButtonUpFile;
     private TextView mTextView;
 
     @Override
@@ -28,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
         mButtonGet = (Button) findViewById(R.id.requestAsync);
         mButtonPost = (Button) findViewById(R.id.requestSync);
         mTextView = (TextView) findViewById(R.id.response);
+        mButtonUpFile = (Button) findViewById(R.id.upFile);
 
         //1.创建OkHttpClient对象
         final OkHttpClient okHttpClient = new OkHttpClient();
@@ -39,6 +45,22 @@ public class MainActivity extends AppCompatActivity {
         final Request request = new Request.Builder()
                 .url("http://192.168.3.106/api/account/login")
                 .post(formBody)
+                .build();
+
+        File file1 = new File("/storage/emulated/0/Download/1.jpg");
+        File file2 = new File("/storage/emulated/0/Download/2.jpg");
+        File file3 = new File("/storage/emulated/0/Download/3.jpg");
+
+        MultipartBody upFileBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file1",file1.getName(),fileBody(file1))
+                .addFormDataPart("file2",file1.getName(),fileBody(file2))
+                .addFormDataPart("file3",file1.getName(),fileBody(file3))
+                .build();
+
+        final Request upFile = new Request.Builder()
+                .url("http://192.168.3.106/api/fs/upload")
+                .post(upFileBody)
                 .build();
 ;
 
@@ -90,5 +112,38 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        mButtonUpFile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                okHttpClient.newCall(upFile).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        final String result = e.toString();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                mTextView.setText("上传图片失败:" + result);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        final String result = response.body().string();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                mTextView.setText("上传图片成功:" + result);
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+    }
+
+    private RequestBody fileBody(File file) {
+        return RequestBody.create(MediaType.parse("application/octet-stream"),file);
     }
 }
