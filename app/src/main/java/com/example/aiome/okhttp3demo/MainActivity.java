@@ -8,10 +8,12 @@ import android.widget.TextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.FormBody;
+import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -36,27 +38,39 @@ public class MainActivity extends AppCompatActivity {
         mButtonUpFile = (Button) findViewById(R.id.upFile);
 
         //1.创建OkHttpClient对象
-        final OkHttpClient okHttpClient = new OkHttpClient();
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder()
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(3,TimeUnit.SECONDS)
+                .writeTimeout(3,TimeUnit.SECONDS)
+                .build();
         //2.创建一个Request
         FormBody formBody = new FormBody.Builder()
                 .add("loginName","15230106379")
                 .add("password","123")
                 .build();
-        final Request request = new Request.Builder()
+        final Request requestPost = new Request.Builder()
                 .url("http://192.168.3.106/api/account/login")
                 .post(formBody)
+                .build();
+        final Request requestGet = new Request.Builder()
+                .url("http://192.168.3.106/api/account/login")
                 .build();
 
         File file1 = new File("/storage/emulated/0/Download/1.jpg");
         File file2 = new File("/storage/emulated/0/Download/2.jpg");
         File file3 = new File("/storage/emulated/0/Download/3.jpg");
 
-        MultipartBody upFileBody = new MultipartBody.Builder()
+        RequestBody upFileBody = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
+                .addPart(Headers.of(
+                        "Content-Disposition",
+                        "form-data; name=\"token\""),
+                        RequestBody.create(null, "212e7f098034446b9219b66918a3edc9gxWB8y"))
                 .addFormDataPart("file1",file1.getName(),fileBody(file1))
-                .addFormDataPart("file2",file1.getName(),fileBody(file2))
-                .addFormDataPart("file3",file1.getName(),fileBody(file3))
+                .addFormDataPart("file2",file2.getName(),fileBody(file2))
+                .addFormDataPart("file3",file3.getName(),fileBody(file3))
                 .build();
+
 
         final Request upFile = new Request.Builder()
                 .url("http://192.168.3.106/api/fs/upload")
@@ -67,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
         mButtonPost.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                okHttpClient.newCall(request).enqueue(new Callback() {
+                okHttpClient.newCall(requestPost).enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
 
@@ -92,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 //4.请求加入调度
-                okHttpClient.newCall(request).enqueue(new Callback() {
+                okHttpClient.newCall(requestGet).enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
 
