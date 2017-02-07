@@ -1,7 +1,10 @@
 package com.example.aiome.okhttp3demo;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
+import com.google.gson.Gson;
 import com.google.gson.internal.$Gson$Types;
 
 import java.io.File;
@@ -9,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Map;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -28,11 +32,14 @@ public class OkHttpUtil {
     private static final String TAG = "OkHttpUtil-";
     private static OkHttpUtil mInstance;
     private OkHttpClient mOkHttpClient;
+    private Handler mHandler;
+    private Gson mGson;
     private boolean log = true;
 
     private OkHttpUtil() {
         mOkHttpClient = new OkHttpClient();
-
+        mHandler = new Handler(Looper.getMainLooper());
+        mGson = new Gson();
     }
     private void log(String msg){
         if (log){
@@ -186,7 +193,7 @@ public class OkHttpUtil {
      */
     public Response postSyncFile(String url, File []files, String []fileKey, Param... params) throws IOException {
         logUrl(url);
-        Request request = bulidMultipartRequest(url,files,fileKey,params);
+        Request request = buildMultipartRequest(url,files,fileKey,params);
         Response response = mOkHttpClient.newCall(request).execute();
 
         logResponse(response.toString());
@@ -205,7 +212,7 @@ public class OkHttpUtil {
     public Response postSyncFile(String url, File []files, String []fileKey) throws IOException {
         logUrl(url);
 
-        Request request = bulidMultipartRequest(url,files,fileKey,null);
+        Request request = buildMultipartRequest(url,files,fileKey,null);
         Response response = mOkHttpClient.newCall(request).execute();
 
         logResponse(response.toString());
@@ -224,7 +231,7 @@ public class OkHttpUtil {
     public Response postSyncFile(String url, File file, String []fileKey, Param... params) throws IOException {
         logUrl(url);
 
-        Request request = bulidMultipartRequest(url,new File[]{file},fileKey,params);
+        Request request = buildMultipartRequest(url,new File[]{file},fileKey,params);
         Response response = mOkHttpClient.newCall(request).execute();
 
         logResponse(response.toString());
@@ -243,7 +250,7 @@ public class OkHttpUtil {
     public Response postSyncFile(String url, File file, String []fileKey) throws IOException {
         logUrl(url);
 
-        Request request = bulidMultipartRequest(url,new File[]{file},fileKey,null);
+        Request request = buildMultipartRequest(url,new File[]{file},fileKey,null);
         Response response = mOkHttpClient.newCall(request).execute();
 
         logResponse(response.toString());
@@ -251,29 +258,143 @@ public class OkHttpUtil {
         return response;
     }
 
-    public void getAsync(String url,final ResultCallBack callBack){
+    /**
+     * 异步get请求
+     * @param url 请求地址
+     * @param callBack 回调
+     */
+    public void getAsync(String url,final ResultCallback callBack){
         final Request request = new Request.Builder()
                 .url(url)
                 .build();
         handleResult(request,callBack);
     }
 
-    private void handleResult(Request request, ResultCallBack back) {
+    /**
+     * 异步post请求
+     * @param url 请求地址
+     * @param callback 回调
+     * @param params 请求参数
+     */
+    public void postAsync(String url, final ResultCallback callback, Param... params){
+        Request request = buildPostRequest(url, params);
+        handleResult(request, callback);
+    }
+
+    /**
+     * 异步post请求
+     * @param url 请求地址
+     * @param callback 回调
+     * @param paramMap 请求参数
+     */
+    public void postAsync(String url, Map<String, String> paramMap, final ResultCallback callback){
+        Param[] params = mapToParams(paramMap);
+        Request request = buildPostRequest(url, params);
+        handleResult(request, callback);
+    }
+
+    /**
+     * 异步post上传文件
+     * @param url 请求地址
+     * @param files 文件
+     * @param fileKey 文件关键字
+     * @param callback 回调
+     * @param params 参数
+     * @throws IOException
+     */
+    public void postAsyncFile(String url, File []files, String []fileKey, ResultCallback callback, Param... params) throws IOException {
+        logUrl(url);
+        Request request = buildMultipartRequest(url,files,fileKey,params);
+
+        handleResult(request, callback);
+    }
+
+    /**
+     * 异步post上传文件不带参数
+     * @param url 请求地址
+     * @param files  文件
+     * @param fileKey 文件关键字
+     * @param callback 回调
+     * @throws IOException
+     */
+    public void postAsyncFile(String url, File []files, String []fileKey, ResultCallback callback) throws IOException {
+        logUrl(url);
+        Request request = buildMultipartRequest(url,files,fileKey,null);
+
+        handleResult(request, callback);
+    }
+
+    private void postAsyncFile(String url, File file, String fileKey,ResultCallback callback, Param... params) throws IOException {
+        logUrl(url);
+
+        Request request = buildMultipartRequest(url, new File[]{file}, new String[]{fileKey}, params);
+
+        handleResult(request, callback);
+    }
+
+    private Param[] mapToParams(Map<String, String> map) {
+        if (map == null){
+            return new Param[0];
+        }
+        Param[] params = new Param[map.size()];
+        int i = 0;
+        for (Map.Entry<String,String> entry : map.entrySet()){
+            params[i++] = new Param(entry.getKey(),entry.getValue());
+        }
+        return params;
+    }
+
+    private void handleResult(Request request, final ResultCallback callBack) {
         mOkHttpClient.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-
+                sendOnFailureCallback(call, e, callBack);
             }
 
             @Override
-            public void onResponse(Call call, Response response) throws IOException {
+            public void onResponse(Call call, Response response){
+                final String string = response.toString();
+                try {
+                    if (callBack.mType == String.class) {
+                        sendOnResponseCallback(string, callBack);
+                    } else {
+                        Object o = mGson.fromJson(string, callBack.mType);
+                        sendOnResponseCallback(o, callBack);
+                    }
+                }catch (com.google.gson.JsonParseException e){
+                    //json解析异常
+                    sendOnFailureCallback(call, e, callBack);
+                }
 
             }
         });
     }
 
+    private void sendOnResponseCallback(final Object response, final ResultCallback callBack) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (callBack != null){
+                    callBack.onResponse(response);
+                }
+            }
+        });
+    }
 
-    private Request bulidMultipartRequest(String url, File []files, String []fileKey, Param[] params) {
+
+    private void sendOnFailureCallback(final Call call, final Exception e, final ResultCallback callBack) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (callBack != null){
+                    callBack.onError(call,e);
+                }
+            }
+        });
+    }
+
+
+    private Request buildMultipartRequest(String url, File []files, String []fileKey, Param[] params) {
         if (params == null){
             params = new Param[0];
         }
@@ -309,8 +430,6 @@ public class OkHttpUtil {
         return request;
     }
 
-
-
     private RequestBody fileBody(File file) {
         return RequestBody.create(MediaType.parse("application/octet-stream"),file);
     }
@@ -332,9 +451,9 @@ public class OkHttpUtil {
         return request;
     }
 
-    public static abstract class ResultCallBack<T>{
+    public static abstract class ResultCallback<T>{
         Type mType;
-        public ResultCallBack() {
+        public ResultCallback() {
             mType = getSuperclassTypeParameter(getClass());
         }
 
@@ -347,7 +466,7 @@ public class OkHttpUtil {
             ParameterizedType parameterized = (ParameterizedType) superclass;
             return $Gson$Types.canonicalize(parameterized.getActualTypeArguments()[0]);
         }
-        public abstract void onError(Request request, Exception e);
+        public abstract void onError(Call call, Exception e);
 
         public abstract void onResponse(T response);
     }
