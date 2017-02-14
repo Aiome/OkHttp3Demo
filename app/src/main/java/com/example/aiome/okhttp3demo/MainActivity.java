@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
                 .post(formBody)
                 .build();
         final Request requestGet = new Request.Builder()
-                .url("http://192.168.3.106/api/account/login")
+                .url("http://192.168.81.2/api/account/login")
                 .build();
 
         File file1 = new File("/storage/emulated/0/Download/1.jpg");

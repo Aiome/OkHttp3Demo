@@ -12,11 +12,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.net.FileNameMap;
+import java.net.URLConnection;
 import java.util.Map;
 
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.FormBody;
+import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -324,10 +327,33 @@ public class OkHttpUtil {
         handleResult(request, callback);
     }
 
-    private void postAsyncFile(String url, File file, String fileKey,ResultCallback callback, Param... params) throws IOException {
+    /**
+     * 异步post的文件上传，单文件且携带其他form参数上传
+     * @param url 请求地址
+     * @param file 文件
+     * @param fileKey 文件关键字
+     * @param callback 回调
+     * @param params 参数
+     * @throws IOException
+     */
+    void postAsyncFile(String url, File file, String fileKey, ResultCallback callback, Param... params) throws IOException {
         logUrl(url);
-
         Request request = buildMultipartRequest(url, new File[]{file}, new String[]{fileKey}, params);
+
+        handleResult(request, callback);
+    }
+    /**
+     * 异步post的文件上传，单文件不带参数
+     * @param url 请求地址
+     * @param file 文件
+     * @param fileKey 文件关键字
+     * @param callback 回调
+     * @throws IOException
+     */
+
+    private void postAsyncFile(String url, File file, String fileKey,ResultCallback callback) throws IOException {
+        logUrl(url);
+        Request request = buildMultipartRequest(url, new File[]{file}, new String[]{fileKey}, null);
 
         handleResult(request, callback);
     }
@@ -353,8 +379,8 @@ public class OkHttpUtil {
 
             @Override
             public void onResponse(Call call, Response response){
-                final String string = response.toString();
                 try {
+                    final String string = response.body().string();
                     if (callBack.mType == String.class) {
                         sendOnResponseCallback(string, callBack);
                     } else {
@@ -364,8 +390,9 @@ public class OkHttpUtil {
                 }catch (com.google.gson.JsonParseException e){
                     //json解析异常
                     sendOnFailureCallback(call, e, callBack);
+                }catch (IOException e){
+                    sendOnFailureCallback(call, e, callBack);
                 }
-
             }
         });
     }
@@ -411,13 +438,16 @@ public class OkHttpUtil {
                 .setType(MultipartBody.FORM);
 
         for (Param param:params){
-            multipartBody.addFormDataPart(param.key,param.value);
+            multipartBody.addPart(Headers.of("Content-Disposition", "form-data; name=\"" + param.key + "\"")
+                    ,RequestBody.create(null, param.value));
             log("Param: " + param.key + " - " + param.value);
         }
 
         if (files != null){
             for (int i = 0; i < files.length; i++){
-                multipartBody.addFormDataPart(fileKey[i],files[i].getName(),fileBody(files[i]));
+                multipartBody.addPart(Headers.of("Content-Disposition",
+                        "form-data; name=\"" + fileKey[i] + "\"; filename=\"" + files[i].getName() + "\"")
+                        ,fileBody(files[i]));
                 log("Files: " + fileKey[i] + " - " + files[i].getName());
             }
         }
@@ -431,7 +461,15 @@ public class OkHttpUtil {
     }
 
     private RequestBody fileBody(File file) {
-        return RequestBody.create(MediaType.parse("application/octet-stream"),file);
+        //获取文件MIME
+        FileNameMap fileNameMap = URLConnection.getFileNameMap();
+        String contentTypeFor = fileNameMap.getContentTypeFor(file.getName());
+        if (contentTypeFor == null)
+        {
+            contentTypeFor = "application/octet-stream";
+        }
+        //返回请求体
+        return RequestBody.create(MediaType.parse(contentTypeFor),file);
     }
 
     private Request buildPostRequest(String url,Param []params){
@@ -453,11 +491,11 @@ public class OkHttpUtil {
 
     public static abstract class ResultCallback<T>{
         Type mType;
-        public ResultCallback() {
+        public ResultCallback () {
             mType = getSuperclassTypeParameter(getClass());
         }
 
-        Type getSuperclassTypeParameter(Class<?> subClass){
+        static Type getSuperclassTypeParameter(Class<?> subClass){
             Type superclass = subClass.getGenericSuperclass();
             if (superclass instanceof Class)
             {
