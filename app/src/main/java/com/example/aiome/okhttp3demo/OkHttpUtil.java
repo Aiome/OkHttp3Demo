@@ -227,7 +227,7 @@ public class OkHttpUtil {
      * @param url 请求地址
      * @param file 文件
      * @param fileKey 文件关键字
-     * @param params 请求参数
+     * @param params 请求参数,可以为null
      * @return
      * @throws IOException
      */
@@ -265,11 +265,10 @@ public class OkHttpUtil {
      * 异步get请求
      * @param url 请求地址
      * @param callBack 回调
+     * @param params 请求参数,可以为null
      */
-    public void getAsync(String url,final ResultCallback callBack){
-        final Request request = new Request.Builder()
-                .url(url)
-                .build();
+    public void getAsync(String url,final ResultCallback callBack, Param... params){
+        Request request = buildPostRequest(url, params);
         handleResult(request,callBack);
     }
 
@@ -277,7 +276,7 @@ public class OkHttpUtil {
      * 异步post请求
      * @param url 请求地址
      * @param callback 回调
-     * @param params 请求参数
+     * @param params 请求参数,可以为null
      */
     public void postAsync(String url, final ResultCallback callback, Param... params){
         Request request = buildPostRequest(url, params);
@@ -288,7 +287,7 @@ public class OkHttpUtil {
      * 异步post请求
      * @param url 请求地址
      * @param callback 回调
-     * @param paramMap 请求参数
+     * @param paramMap 请求参数,可以为null
      */
     public void postAsync(String url, Map<String, String> paramMap, final ResultCallback callback){
         Param[] params = mapToParams(paramMap);
@@ -302,7 +301,7 @@ public class OkHttpUtil {
      * @param files 文件
      * @param fileKey 文件关键字
      * @param callback 回调
-     * @param params 参数
+     * @param params 请求参数,可以为null
      * @throws IOException
      */
     public void postAsyncFile(String url, File []files, String []fileKey, ResultCallback callback, Param... params) throws IOException {
@@ -333,7 +332,7 @@ public class OkHttpUtil {
      * @param file 文件
      * @param fileKey 文件关键字
      * @param callback 回调
-     * @param params 参数
+     * @param params 请求参数,可以为null
      * @throws IOException
      */
     void postAsyncFile(String url, File file, String fileKey, ResultCallback callback, Param... params) throws IOException {
@@ -347,7 +346,7 @@ public class OkHttpUtil {
      * @param url 请求地址
      * @param file 文件
      * @param fileKey 文件关键字
-     * @param callback 回调
+     * @param callback 请求参数,可以为null
      * @throws IOException
      */
 
@@ -374,13 +373,16 @@ public class OkHttpUtil {
         mOkHttpClient.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                sendOnFailureCallback(call, e, callBack);
+                sendOnErrorCallback(call, e, callBack);
             }
 
             @Override
             public void onResponse(Call call, Response response){
                 try {
                     final String string = response.body().string();
+
+                    OkHttpUtil.getInstance().logResponse(string);
+
                     if (callBack.mType == String.class) {
                         sendOnResponseCallback(string, callBack);
                     } else {
@@ -389,9 +391,9 @@ public class OkHttpUtil {
                     }
                 }catch (com.google.gson.JsonParseException e){
                     //json解析异常
-                    sendOnFailureCallback(call, e, callBack);
+                    sendOnErrorCallback(call, e, callBack);
                 }catch (IOException e){
-                    sendOnFailureCallback(call, e, callBack);
+                    sendOnErrorCallback(call, e, callBack);
                 }
             }
         });
@@ -409,7 +411,7 @@ public class OkHttpUtil {
     }
 
 
-    private void sendOnFailureCallback(final Call call, final Exception e, final ResultCallback callBack) {
+    private void sendOnErrorCallback(final Call call, final Exception e, final ResultCallback callBack) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {

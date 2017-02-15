@@ -4,7 +4,18 @@
               android:layout_width="match_parent"
               android:layout_height="match_parent">
 
-
+    <Button
+        android:text="异步get"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/get"
+        style="@style/Widget.AppCompat.Button"/>
+    <Button
+        android:text="异步post"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/post"
+        style="@style/Widget.AppCompat.Button"/>
     <Button
         android:text="异步上传多个文件+参数"
         android:layout_width="match_parent"
@@ -32,4 +43,9 @@
         android:layout_height="wrap_content"
         android:id="@+id/uploadFile"
         style="@style/Widget.AppCompat.Button"/>
+
+    <TextView
+        android:id="@+id/result"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 </LinearLayout>
